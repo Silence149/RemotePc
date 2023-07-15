@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.33801.198
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ReClient_KBH_CMD", "ReClient_KBH_CMD\ReClient_KBH_CMD.vcxproj", "{3A59689A-D000-4CE6-967F-EFB716AA5EBB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3A59689A-D000-4CE6-967F-EFB716AA5EBB}.Debug|x64.ActiveCfg = Debug|x64
+		{3A59689A-D000-4CE6-967F-EFB716AA5EBB}.Debug|x64.Build.0 = Debug|x64
+		{3A59689A-D000-4CE6-967F-EFB716AA5EBB}.Debug|x86.ActiveCfg = Debug|Win32
+		{3A59689A-D000-4CE6-967F-EFB716AA5EBB}.Debug|x86.Build.0 = Debug|Win32
+		{3A59689A-D000-4CE6-967F-EFB716AA5EBB}.Release|x64.ActiveCfg = Release|x64
+		{3A59689A-D000-4CE6-967F-EFB716AA5EBB}.Release|x64.Build.0 = Release|x64
+		{3A59689A-D000-4CE6-967F-EFB716AA5EBB}.Release|x86.ActiveCfg = Release|Win32
+		{3A59689A-D000-4CE6-967F-EFB716AA5EBB}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {67F82924-8230-4E6B-87A1-F2C05BB01025}
+	EndGlobalSection
+EndGlobal
