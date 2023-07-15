@@ -13,7 +13,16 @@
 //
 //#define _AFXDLL
 
-#pragma comment(lib,"KBHook_DLL.lib")
+#ifdef _DEBUG
+#pragma comment(lib,"../../../bin/RemotePc/Debug/KBHook_DLL.lib")
+#else
+#pragma comment(lib,"../../../bin/RemotePc/Release/KBHook_DLL.lib")
+#endif // _DEBUG
+
+
+
+
+
 #pragma comment(lib,"ws2_32.lib")
 
 #define MAX_LOADSTRING 100
@@ -80,6 +89,8 @@ int InitSocket() {
 	}
 
 	printf("Our connection successed.\n");
+
+	send(s,"Hello",sizeof("Hello"),0);
 
 	return 1;
 }
