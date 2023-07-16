@@ -8,6 +8,11 @@
 #include "MfcServerDlg.h"
 #include "afxdialogex.h"
 
+#include "../../client/ReClient_KBH_CMD/MyPacket.h"
+#include "CScreenDlg.h"
+
+
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -67,6 +72,8 @@ BEGIN_MESSAGE_MAP(CMfcServerDlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+	ON_NOTIFY(NM_RCLICK, IDC_LIST1, &CMfcServerDlg::OnNMRClickList1)
+	ON_COMMAND(IDN_SCREEN, &CMfcServerDlg::OnScreen)
 END_MESSAGE_MAP()
 
 
@@ -151,56 +158,117 @@ DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 
 
 		//将数据插入到对话框中
-		pThis->m_Lst.InsertItem(pThis->m_map.size(),(LPCTSTR)szIpAddr);
+		int nIndex = pThis->m_Lst.InsertItem(pThis->m_map.size(),(LPCTSTR)szIpAddr);
+		if (nIndex != -1)
+		{
+			//将socket与列表行关联起来
+			pThis->m_Lst.SetItemData(nIndex, NewConnection);
+		}
 
 
-	//开启线程，显示收到的数据
-		
+	
+
+		//开启线程，显示收到的数据
+
 
 		std::thread thd([&]() {
 			//表示子程序新的起点
+			// 直接收取socket的数据，并显示出来（从客户端cmd里转发过来的）
+			bool bRet = false;
+			char* szRecvBuf = NULL;
 
-			
 			while (TRUE)
 			{
-				//这里添加对包的解析
 
-				/*
-					先收8字节头部
-					再收剩下的部分
-				
-				*/
-
-				// 直接收取socket的数据，并显示出来（从客户端cmd里转发过来的）
-				char szBuf[256] = { 0 };
-				DWORD nRead;
-				int nRet = recv(NewConnection, szBuf, 255, 0);
-				if (nRet == SOCKET_ERROR)
+				// 先收取包的头部数据
+				DWORD nReadBytes;
+				MyPacket pkt;
+				bRet = RecvData(NewConnection, (const char*)&pkt, sizeof(unsigned int) * 2);
+				if (!bRet)
 				{
-					//表示tcp断开
 					return 0;
 				}
-				else if (nRet > 0)
-				{
 
-					//直接打印数据	
-					printf(szBuf);
-					std::string str = strIp;
-					str += ":";
-					str += szBuf;
-					OutputDebugStringA(str.c_str());
-					//MessageBoxA(0, str.c_str(),"strIp",0);
+				//到这里表示成功收取了头部数据，接下来收取尾部数据
+				if (pkt.length > 0)
+				{
+					//包的数据部分有数据
+
+					szRecvBuf = new char[pkt.length];
+					if (szRecvBuf == NULL)
+					{
+						return 0;
+					}
+
+					bRet = RecvData(NewConnection, szRecvBuf, pkt.length);
+					if (!bRet)
+					{
+						return 0;
+					}
+
+
+
+				}
+
+				//到这里表示收取了具体的长度数据，可以开始处理了
+
+				switch (pkt.type)
+				{
+				case PACKET_RLY_SCREEN:
+				{
+					//表示已经从客户端收取了具体的数据可以开始处理了	
+					if (pSession->pScreenDlg != NULL)
+					{
+						//拿获取到的对话框，显示远程发送过来的具体屏幕数据
+						if (!pSession->pScreenDlg->IsWindowVisible())
+						{
+							pSession->pScreenDlg->ShowWindow(SW_SHOWNORMAL);
+						}
+						//将内容画上我们的对话框
+						pSession->pScreenDlg->ShowScreen(szRecvBuf, pkt.length);
+						if (szRecvBuf != NULL)
+						{
+							delete[] szRecvBuf;
+						}
+
+						//通知客户端发下一张
+						SendCommand(NewConnection, PACKET_REQ_SCREEN);
+					
+					}
+
+
+					
+				}
+				break;
+
+				default:
+					break;
 				}
 
 
 
 			}
+
+			if (szRecvBuf != NULL)
+			{
+				delete[] szRecvBuf;
+			}
+
+
+
+
+
+
 			});
 
 		//接触thd与线程回调函数的绑定
 		thd.detach();
-		
-		
+
+
+
+
+
+
 
 
 
@@ -387,5 +455,64 @@ void CMfcServerDlg::OnPaint()
 HCURSOR CMfcServerDlg::OnQueryDragIcon()
 {
 	return static_cast<HCURSOR>(m_hIcon);
+}
+
+
+
+void CMfcServerDlg::OnNMRClickList1(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
+	// TODO: 在此添加控件通知处理程序代码
+	//用户右键菜单显示效果
+	CMenu mn;
+	//获取主菜单
+	mn.LoadMenu(IDR_MENU1);
+	//获取子菜单
+	CMenu* pSubMenu = mn.GetSubMenu(0);
+	//获取鼠标当前的坐标
+	POINT pt;
+	GetCursorPos(&pt);
+
+	pSubMenu->TrackPopupMenu(TPM_LEFTALIGN,pt.x,pt.y,this);
+
+	*pResult = 0;
+}
+
+
+void CMfcServerDlg::OnScreen()
+{
+	// TODO: 在此添加命令处理程序代码
+	//表示右键菜单屏幕显示时的效果处理
+
+	//获取当前的选中的行，然后获取对应的socket，最后向该socket发送命令给客户端
+
+	//获取当前选中行的位置
+	int nPos = m_Lst.GetSelectionMark();
+	//获得刚才存储的data，也就是我们的socket
+	SOCKET NewConnection = m_Lst.GetItemData(nPos);
+	//向该socket发送一个，请求屏幕信息的命令
+	SendCommand(NewConnection, PACKET_REQ_SCREEN);
+	//创建一个屏幕对话框
+	//根据socket 获取对应的socket上下文
+
+		//我们需要把他锁起来  这里的{}表示块作用域
+	{
+		//以后凡是需要对map进行增删改查都需要加上这样一句话
+		//每次只允许一个线程访问
+		std::lock_guard<std::mutex> lg(m_AcceptMtx);
+
+		//如果发现他原来没有对话框，就创建对话框
+		if (m_map[NewConnection]->pScreenDlg == NULL)
+		{
+			m_map[NewConnection]->pScreenDlg = new CScreenDlg;
+
+			m_map[NewConnection]->pScreenDlg->Create(IDD_SCREENDLG,this);
+
+		}
+
+		//这里需要开启一个线程来收数据，便于以后处理
+	}
+
+
 }
 

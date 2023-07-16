@@ -189,6 +189,8 @@
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\client\ReClient_KBH_CMD\MyPacket.h" />
+    <ClInclude Include="CScreenDlg.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="MfcServer.h" />
     <ClInclude Include="MfcServerDlg.h" />
@@ -197,6 +199,7 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CScreenDlg.cpp" />
     <ClCompile Include="MfcServer.cpp" />
     <ClCompile Include="MfcServerDlg.cpp" />
     <ClCompile Include="pch.cpp">

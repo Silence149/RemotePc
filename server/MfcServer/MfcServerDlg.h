@@ -8,6 +8,12 @@
 #include <mutex>
 #include <stdio.h>
 
+
+
+class CScreenDlg;
+
+
+
 //建立一个结构体来表示当前的连接数据 session会话
 struct MySession
 {
@@ -15,6 +21,14 @@ struct MySession
 	sockaddr_in addr;
 	DWORD dwLastTickout;//客户机通信最后活跃时间，后面用于心跳管理
 	std::string strIp;//表示客户机ip地址
+	
+	CScreenDlg* pScreenDlg;//用于记录当前session的屏幕对话框
+
+	MySession() {
+		pScreenDlg = NULL;
+	
+	}
+
 };
 
 
@@ -67,4 +81,6 @@ public:
 	std::mutex m_AcceptMtx;//用于记录map的同步问题
 
 
+	afx_msg void OnNMRClickList1(NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg void OnScreen();
 };
