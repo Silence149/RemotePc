@@ -80,6 +80,8 @@ public:
 	//需要一个互斥体
 	std::mutex m_AcceptMtx;//用于记录map的同步问题
 
+	std::mutex m_ScreenMtx;//用于屏幕显示的同步问题
+
 
 	afx_msg void OnNMRClickList1(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnScreen();

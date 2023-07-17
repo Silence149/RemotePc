@@ -11,7 +11,7 @@
 #include "../../client/ReClient_KBH_CMD/MyPacket.h"
 #include "CScreenDlg.h"
 
-
+#include <vector>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -25,12 +25,12 @@ class CAboutDlg : public CDialogEx
 public:
 	CAboutDlg();
 
-// 对话框数据
+	// 对话框数据
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_ABOUTBOX };
 #endif
 
-	protected:
+protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
 
 
@@ -84,6 +84,97 @@ END_MESSAGE_MAP()
 DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 
 	CMfcServerDlg* pThis = (CMfcServerDlg*)lpParam;
+
+
+	//需要开启一个检测线程来循环处理每一个客户端，判断是否超时
+
+
+	//开启一个心跳线程。循环发送数据
+
+	std::thread heartThd([&]() {
+		//表示子程序新的起点
+
+		DWORD dwLastTicket = GetTickCount();//表示最后一次的时间戳
+
+		while (true)
+		{
+
+
+			
+				
+
+				//开始遍历map,通过map的遍历，查找每一个客户端都是否在线
+
+				std::vector<SOCKET> sAry;
+
+				for (auto m : pThis->m_map) {
+
+					SOCKET s = m.first;
+					MySession* pSession = m.second;
+
+					//判断最后一次收包与当前时间，超过了两倍，则表示掉线了
+					if (GetTickCount() - pSession->dwLastTickout > HEART_BEAT_TIME * 2)
+					{
+						//此时掉线应该处理map，处理界面，处理socket
+						//1 处理socket
+						closesocket(s);
+
+						//建立一个sAry 记录当前所有掉线的socket
+						sAry.push_back(s);
+
+					}
+
+				}
+
+				//开始统一处理掉线
+				//2 处理map
+
+				if (sAry.size() >0)
+				{
+					std::lock_guard<std::mutex> lg(pThis->m_AcceptMtx);
+					for (auto l : sAry) {
+
+						pThis->m_map.erase(l);
+
+					}
+				}
+
+
+				//界面上也去除这一行
+				for (int i = 0; i < pThis->m_Lst.GetItemCount(); i++)
+				{
+					//获得对应在界面的行数
+					SOCKET NewConnection = pThis->m_Lst.GetItemData(i);
+					//判断是否存在这个socket
+
+					for (auto l : sAry)
+					{
+						if (l == NewConnection)
+						{
+							pThis->m_Lst.DeleteItem(i);
+							break;
+
+						}
+					}
+
+					sAry.clear();
+
+					Sleep(HEART_BEAT_TIME);
+				}
+
+
+			
+
+
+
+
+		}
+
+
+		});
+	heartThd.detach();
+
+
 	//3. accept 接受请求 等待别人连接
 	//SOCKET NewConnection;//返回的socket 专门用于与客户端通信，一般这里开线程循环接受
 	while (true)
@@ -132,7 +223,7 @@ DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 		//Unicode版本
 		char* strIp = inet_ntoa(ClientAddr.sin_addr);
 		//pSession->strIp = strIp;
-		wchar_t wIp[256] = {0};
+		wchar_t wIp[256] = { 0 };
 		////将ip从asscil 转unicode
 		mbstowcs(wIp, strIp, strlen(strIp));
 
@@ -140,25 +231,25 @@ DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 
 		_stprintf(szIpAddr, _T("%s:%d"),
 			wIp,//ip
-		ntohs(ClientAddr.sin_port));// 端口
+			ntohs(ClientAddr.sin_port));// 端口
 
-		/*
-		//asscil版本
+			/*
+			//asscil版本
 
-		char szIpAddr[256] = { 0 };
-		
-		sprintf(szIpAddr, "%s:%d",
-		inet_ntoa(ClientAddr.sin_addr),//ip
-		ntohs(ClientAddr.sin_port));// 端口
-		
-		
-		*/
+			char szIpAddr[256] = { 0 };
 
-	
+			sprintf(szIpAddr, "%s:%d",
+			inet_ntoa(ClientAddr.sin_addr),//ip
+			ntohs(ClientAddr.sin_port));// 端口
 
 
-		//将数据插入到对话框中
-		int nIndex = pThis->m_Lst.InsertItem(pThis->m_map.size(),(LPCTSTR)szIpAddr);
+			*/
+
+
+
+
+			//将数据插入到对话框中
+		int nIndex = pThis->m_Lst.InsertItem(pThis->m_map.size(), (LPCTSTR)szIpAddr);
 		if (nIndex != -1)
 		{
 			//将socket与列表行关联起来
@@ -166,7 +257,7 @@ DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 		}
 
 
-	
+
 
 		//开启线程，显示收到的数据
 
@@ -210,6 +301,10 @@ DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 
 				}
 
+				//更新最后一次接受数据的时间
+				pSession->dwLastTickout = GetTickCount();
+
+
 				//到这里表示收取了具体的长度数据，可以开始处理了
 
 				switch (pkt.type)
@@ -219,6 +314,8 @@ DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 					//表示已经从客户端收取了具体的数据可以开始处理了	
 					if (pSession->pScreenDlg != NULL)
 					{
+
+
 						//拿获取到的对话框，显示远程发送过来的具体屏幕数据
 						if (!pSession->pScreenDlg->IsWindowVisible())
 						{
@@ -226,33 +323,42 @@ DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 						}
 						//将内容画上我们的对话框
 						pSession->pScreenDlg->ShowScreen(szRecvBuf, pkt.length);
-						if (szRecvBuf != NULL)
-						{
-							delete[] szRecvBuf;
-						}
+
 
 						//通知客户端发下一张
 						SendCommand(NewConnection, PACKET_REQ_SCREEN);
-					
+
 					}
 
 
-					
+
 				}
 				break;
+
+				case PACKET_REQ_BEAT:
+				{
+					//表示收到心跳包，开始回复数据
+					SendCommand(NewConnection, PACKET_RLY_BEAT);
+
+
+
+				}
+				break;
+
 
 				default:
 					break;
 				}
 
+				if (szRecvBuf != NULL)
+				{
+					delete[] szRecvBuf;
+					szRecvBuf = NULL;
+				}
 
 
 			}
 
-			if (szRecvBuf != NULL)
-			{
-				delete[] szRecvBuf;
-			}
 
 
 
@@ -324,19 +430,19 @@ bool CMfcServerDlg::InitAcceptSocket() {
 
 	//使用WindowsAPI创建线程
 	//返回的是线程的句柄
-	m_hAcceptThd=CreateThread(NULL, // SD
+	m_hAcceptThd = CreateThread(NULL, // SD
 		0,                        // initial stack size
-		(LPTHREAD_START_ROUTINE) AcceptFuncThread,    // thread function
+		(LPTHREAD_START_ROUTINE)AcceptFuncThread,    // thread function
 		this,                       // thread argument
 		0,                    // creation option 填0表示线程立马执行 CREATE_SUSPENDED 表示线程挂起
 		0                        // thread identifier
 	);
 
-	
+
 	//恢复线程运行
 	//ResumeThread(m_hAcceptThd);
-	
-	
+
+
 
 
 
@@ -399,7 +505,7 @@ BOOL CMfcServerDlg::OnInitDialog()
 	//m_Lst.InsertItem(0,_T("127.0.0.1"));
 
 	//开始初始化网络
-	bool bRet= InitAcceptSocket();
+	bool bRet = InitAcceptSocket();
 	if (!bRet)
 	{
 		return FALSE;
@@ -473,7 +579,7 @@ void CMfcServerDlg::OnNMRClickList1(NMHDR *pNMHDR, LRESULT *pResult)
 	POINT pt;
 	GetCursorPos(&pt);
 
-	pSubMenu->TrackPopupMenu(TPM_LEFTALIGN,pt.x,pt.y,this);
+	pSubMenu->TrackPopupMenu(TPM_LEFTALIGN, pt.x, pt.y, this);
 
 	*pResult = 0;
 }
@@ -501,14 +607,18 @@ void CMfcServerDlg::OnScreen()
 		//每次只允许一个线程访问
 		std::lock_guard<std::mutex> lg(m_AcceptMtx);
 
+
+
 		//如果发现他原来没有对话框，就创建对话框
 		if (m_map[NewConnection]->pScreenDlg == NULL)
 		{
 			m_map[NewConnection]->pScreenDlg = new CScreenDlg;
 
-			m_map[NewConnection]->pScreenDlg->Create(IDD_SCREENDLG,this);
+			m_map[NewConnection]->pScreenDlg->Create(IDD_SCREENDLG, this);
 
 		}
+
+
 
 		//这里需要开启一个线程来收数据，便于以后处理
 	}

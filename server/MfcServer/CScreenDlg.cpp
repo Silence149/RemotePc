@@ -20,6 +20,8 @@ CScreenDlg::CScreenDlg(CWnd* pParent /*=nullptr*/)
 
 CScreenDlg::~CScreenDlg()
 {
+
+
 }
 
 void CScreenDlg::DoDataExchange(CDataExchange* pDX)
@@ -44,19 +46,23 @@ bool CScreenDlg::ShowScreen(const char* pBuf, int nLength)
 
 	CDC memDC;//创建一个内存DC
 	CBitmap bitMap;//创建一个兼容位图
-	memDC.CreateCompatibleDC(GetDC());
-	bitMap.CreateCompatibleBitmap(GetDC(), pScreenData->nWidth, pScreenData->nHeight);
+	CDC* pDC = GetDC();
+	memDC.CreateCompatibleDC(pDC);
+	bitMap.CreateCompatibleBitmap(pDC, pScreenData->nWidth, pScreenData->nHeight);
 	memDC.SelectObject(bitMap);
 
 	//将获取到的数据直接写入到内存dc的bitmap中
 	bitMap.SetBitmapBits(nLength - 8, pScreenData->data);
 
 	//接下来将内存dc的数据拷贝给屏幕dc
-	GetDC()->BitBlt(0, 0, pScreenData->nWidth, pScreenData->nHeight, &memDC, 0, 0, SRCCOPY);
+	pDC->BitBlt(0, 0, pScreenData->nWidth, pScreenData->nHeight, &memDC, 0, 0, SRCCOPY);
 
 	UpdateWindow();
 
-
+	memDC.DeleteDC();
+	bitMap.DeleteObject();
+	ReleaseDC(pDC);
+	
 	return true;
 }
 

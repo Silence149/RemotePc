@@ -42,14 +42,14 @@ char szBuf[4096] = { 0 };
 
 int InitSocket() {
 
-	//初始化套接字
+	////初始化套接字
 
-	nRet = WSAStartup(MAKEWORD(2, 2), &wasData);
-	if (nRet != 0)
-	{
-		printf("WSAStartup failed with erro %d\n", nRet);
-		return 0;
-	}
+	//nRet = WSAStartup(MAKEWORD(2, 2), &wasData);
+	//if (nRet != 0)
+	//{
+	//	printf("WSAStartup failed with erro %d\n", nRet);
+	//	return 0;
+	//}
 
 	//1. socket 创建套接字 (可以理解成管道的Pipe句柄，用于后续数据传输接口)
 	s = WSASocket(
@@ -68,27 +68,6 @@ int InitSocket() {
 	}
 
 
-	//3. connect  cmd主动连接服务端
-
-
-	sockaddr_in addr;//服务端套接字
-
-	addr.sin_family = AF_INET;//协议
-	addr.sin_port = htons(Port);
-	addr.sin_addr.S_un.S_addr = inet_addr("192.168.68.1");;//服务端ip地址
-	printf("We are trying to connect to %s:%d\n", inet_ntoa(addr.sin_addr), addr.sin_port);
-
-	nRet = connect(s, (SOCKADDR*)&addr, sizeof(addr));
-	if (nRet == SOCKET_ERROR)
-	{
-		printf("connect failed with erro %d\n", WSAGetLastError());
-		closesocket(s);
-		WSACleanup();
-		return 0;
-
-	}
-
-	printf("Our connection successed.\n");
 
 	//send(s,"Hello",sizeof("Hello"),0);
 
@@ -179,7 +158,7 @@ int InitCmd()
 
 */
 
-int mySend(SOCKET s,char* szBuf,unsigned int PktType) {
+int mySend(SOCKET s, char* szBuf, unsigned int PktType) {
 
 
 	char szBuf1[4096] = { 0 };
@@ -253,10 +232,10 @@ INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 //显示桌面数据
 BOOL GetMyCapture(SOCKET s) {
 
-	HWND hDesktopWnd=NULL;
-	HDC hDeskDC= NULL;
-	HDC hMemDC= NULL;
-	HBITMAP hBitMap= NULL;
+	HWND hDesktopWnd = NULL;
+	HDC hDeskDC = NULL;
+	HDC hMemDC = NULL;
+	HBITMAP hBitMap = NULL;
 	char* pBitMapBuf = NULL;
 	BOOL bResult = TRUE;
 
@@ -338,7 +317,7 @@ BOOL GetMyCapture(SOCKET s) {
 		}
 
 		//7.从内存DC中获取位图数据
-		int nBufSize = nWidth * nHeight * 4+8;
+		int nBufSize = nWidth * nHeight * 4 + 8;
 		//这里额外增加8字节用于存放宽和高，以便服务端接受
 
 		pBitMapBuf = new char[nBufSize];
@@ -353,9 +332,9 @@ BOOL GetMyCapture(SOCKET s) {
 		pScreenData->nHeight = nHeight;
 
 
-		LONG nBitSize= GetBitmapBits(hBitMap,      // handle to bitmap
-			nBufSize-8,     // number of bytes to copy
-			pBitMapBuf+8     // buffer to receive bits
+		LONG nBitSize = GetBitmapBits(hBitMap,      // handle to bitmap
+			nBufSize - 8,     // number of bytes to copy
+			pBitMapBuf + 8     // buffer to receive bits
 		);
 		if (nBitSize == 0)
 		{
@@ -363,7 +342,34 @@ BOOL GetMyCapture(SOCKET s) {
 		}
 
 		//到这里表示拿到了数据,把数据发送到我们的服务端
-		SendData(s, PACKET_RLY_SCREEN, pBitMapBuf, nBitSize);
+		//发包需要将要发送的数据放到队列中，然后由一个单独的线程读取队列发送
+		bool bRet = false;
+
+		bRet = SendData(s, PACKET_RLY_SCREEN, pBitMapBuf, nBitSize);
+		if (!bRet)
+		{
+			return 0;
+		}
+
+		////先发送头部数据
+		//bool bRet = false;
+		//DWORD nReadBytes;
+		//MyPacket pkt;
+		//pkt.length = nBitSize;
+		//pkt.type = PACKET_RLY_SCREEN;
+		//bRet = SendData(s, (const char*)&pkt, sizeof(unsigned int) * 2);
+		//if (!bRet)
+		//{
+		//	return 0;
+		//}
+
+		////接下来发送尾部数据
+		//bRet = SendData(s, pBitMapBuf, pkt.length);
+		//if (!bRet)
+		//{
+		//	return 0;
+		//}
+
 
 	}
 	catch (const std::exception&)
@@ -392,7 +398,7 @@ BOOL GetMyCapture(SOCKET s) {
 		delete[] pBitMapBuf;
 	}
 
-	
+
 
 	return bResult;
 }
@@ -404,31 +410,31 @@ BOOL GetMyCapture(SOCKET s) {
 
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-                     _In_opt_ HINSTANCE hPrevInstance,
-                     _In_ LPWSTR    lpCmdLine,
-                     _In_ int       nCmdShow)
+	_In_opt_ HINSTANCE hPrevInstance,
+	_In_ LPWSTR    lpCmdLine,
+	_In_ int       nCmdShow)
 {
-    UNREFERENCED_PARAMETER(hPrevInstance);
-    UNREFERENCED_PARAMETER(lpCmdLine);
+	UNREFERENCED_PARAMETER(hPrevInstance);
+	UNREFERENCED_PARAMETER(lpCmdLine);
 
-    // TODO: 在此处放置代码。
+	// TODO: 在此处放置代码。
 
-    // 初始化全局字符串
-    LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-    LoadStringW(hInstance, IDC_RECLIENTKBHCMD, szWindowClass, MAX_LOADSTRING);
-    MyRegisterClass(hInstance);
+	// 初始化全局字符串
+	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
+	LoadStringW(hInstance, IDC_RECLIENTKBHCMD, szWindowClass, MAX_LOADSTRING);
+	MyRegisterClass(hInstance);
 
-    // 执行应用程序初始化:
-    if (!InitInstance (hInstance, nCmdShow))
-    {
-        return FALSE;
-    }
+	// 执行应用程序初始化:
+	if (!InitInstance(hInstance, nCmdShow))
+	{
+		return FALSE;
+	}
 
-    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_RECLIENTKBHCMD));
+	HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_RECLIENTKBHCMD));
 
-	
-	
-	
+
+
+
 	//nRet = InitCmd();
 	//if (!nRet)
 	//{
@@ -436,84 +442,236 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	//	return 0;
 	//}
 
-	nRet = InitSocket();
-	if (!nRet)
+
+	//初始化套接字
+
+	//nRet = WSAStartup(MAKEWORD(2, 2), &wasData);
+	//if (nRet != 0)
+	//{
+	//	printf("WSAStartup failed with erro %d\n", nRet);
+	//	return 0;
+	//}
+
+	nRet = WSAStartup(MAKEWORD(2, 2), &wasData);
+	if (nRet != 0)
 	{
-		printf("InitSocket error");
-		return 0;
+		printf("WSAStartup failed with erro %d\n", nRet);
+
 	}
 
+	std::thread connThd([&]() {
 
+		//用事件来处理当前的状态
+		HANDLE hEvent = INVALID_HANDLE_VALUE;
+		hEvent=CreateEvent(NULL,//安全属性不用给
+			FALSE,//表示自动处理事件的状态
+			FALSE,//表示初始没有信号的状态
+			NULL //名字不用给
+		);
 
-	//开启线程，显示收到的数据
-
-
-	std::thread thd([&]() {
-		//表示子程序新的起点
-		// 直接收取socket的数据，并显示出来（从客户端cmd里转发过来的）
-		bool bRet = false;
-		char* szRecvBuf = NULL;
-
-		while (TRUE)
+		while (true)
 		{
+			
+			//表示已经掉线了
 
-			// 先收取包的头部数据
-			DWORD nReadBytes;
-			MyPacket pkt;
-			bRet=RecvData(s, (const char*)&pkt, sizeof(unsigned int) * 2);
-			if (!bRet)
-			{
-				return 0;
-			}
+
+			//bool bConnected = false;
+			//1. socket 创建套接字 (可以理解成管道的Pipe句柄，用于后续数据传输接口)
+			s = WSASocket(
+				AF_INET,//INET协议簇
+				SOCK_STREAM,//表示使用TCP协议
+				0,
+				NULL,
+				0,
+				0);
 				
-			//到这里表示成功收取了头部数据，接下来收取尾部数据
-			if (pkt.length > 0)
+			if (s == INVALID_SOCKET)
 			{
-				//包的数据部分有数据
+				OutputDebugStringA("套接字创建失败");
 
-				szRecvBuf = new char[pkt.length];
-				if (szRecvBuf == NULL)
+			}
+			
+
+
+			//3. connect  cmd主动连接服务端
+
+			OutputDebugStringA("开始连接服务器");
+			sockaddr_in addr;//服务端套接字
+
+			addr.sin_family = AF_INET;//协议
+			addr.sin_port = htons(Port);
+			addr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");;//服务端ip地址
+			printf("We are trying to connect to %s:%d\n", inet_ntoa(addr.sin_addr), addr.sin_port);
+
+			nRet = connect(s, (SOCKADDR*)&addr, sizeof(addr));
+			if (nRet == SOCKET_ERROR)
+			{
+				OutputDebugStringA("连接失败，等10s继续");
+				Sleep(5 * 1000);
+				continue;
+
+			}
+
+
+			OutputDebugStringA("成功连接上服务器");
+
+			//bool bConnected = true;
+
+			DWORD dwLastRecvedTick = GetTickCount();			//表示最后一次收到包的时间
+
+			//开启一个心跳线程。循环发送数据
+
+			std::thread heartThd([&]() {
+				//表示子程序新的起点
+
+				bool bRet = false;
+				char* szRecvBuf = NULL;
+				DWORD dwLastTicket = GetTickCount();//表示最后一次的时间戳
+
+
+				while (true)
 				{
-					return 0;
+					if ((GetTickCount() - dwLastTicket) > HEART_BEAT_TIME)
+					{
+						//表示需要发送心跳包数据
+						SendCommand(s, PACKET_REQ_BEAT);
+						dwLastTicket = GetTickCount();
+					}
+
+					if ((GetTickCount() - dwLastRecvedTick) > HEART_BEAT_TIME * 2)
+					{
+						//我们认为已经掉线了，开始做断线重连操作
+						//把当前客户端socket关闭，这样recv函数就会返回-1，从而退出收包线程
+						//bool bConnected = false;
+						OutputDebugStringA("开始做断线重连操作");
+						//给我们的事件一个状态，表示有信号了
+						SetEvent(hEvent);
+
+						closesocket(s);
+						break;
+
+					}
+
+
+					Sleep(HEART_BEAT_TIME);
+
 				}
 
-				bRet=RecvData(s, szRecvBuf, pkt.length);
-				if (!bRet)
+
+
+
+
+				});
+
+			//接触thd与线程回调函数的绑定
+			heartThd.detach();
+
+
+
+
+
+
+			//开启线程，显示收到的数据
+
+
+			std::thread thd([&]() {
+				//表示子程序新的起点
+				// 直接收取socket的数据，并显示出来（从客户端cmd里转发过来的）
+				bool bRet = false;
+				char* szRecvBuf = NULL;
+
+				while (TRUE)
 				{
-					return 0;
+
+					// 先收取包的头部数据
+					DWORD nReadBytes;
+					MyPacket pkt;
+					bRet = RecvData(s, (const char*)&pkt, sizeof(unsigned int) * 2);
+					if (!bRet)
+					{
+						return 0;
+					}
+
+					//到这里表示成功收取了头部数据，接下来收取尾部数据
+					if (pkt.length > 0)
+					{
+						//包的数据部分有数据
+
+						szRecvBuf = new char[pkt.length];
+						if (szRecvBuf == NULL)
+						{
+							return 0;
+						}
+
+						bRet = RecvData(s, szRecvBuf, pkt.length);
+						if (!bRet)
+						{
+							return 0;
+						}
+
+
+
+					}
+					//到这里表示收到包了
+					dwLastRecvedTick = GetTickCount();
+					//到这里表示收取了具体的长度数据，可以开始处理了
+
+					switch (pkt.type)
+					{
+					case PACKET_REQ_SCREEN:
+					{
+						//表示服务端向客户端请求了屏幕数据，我们返回一帧数据
+						GetMyCapture(s);
+					}
+					break;
+
+					case PACKET_RLY_BEAT: {
+						OutputDebugStringA("收到了心跳包的回复");
+					}
+					break;
+
+
+					default:
+						break;
+					}
+
+					if (szRecvBuf != NULL)
+					{
+						delete[] szRecvBuf;
+						szRecvBuf = NULL;
+					}
+
+
 				}
 
 
 
-			}
-
-			//到这里表示收取了具体的长度数据，可以开始处理了
-
-			switch (pkt.type )
-			{
-			case PACKET_REQ_SCREEN:
-			{
-				//表示服务端向客户端请求了屏幕数据，我们返回一帧数据
-				GetMyCapture(s);
-			}
-			break;
-
-			default:
-				break;
-			}
 
 
+				});
+
+			//接触thd与线程回调函数的绑定
+			thd.detach();
+
+			//死循环，表示当前是否已经掉线，否则返回前面重新连接
+			//while (true)
+			//{
+			//	Sleep(10 * 1000);
+			//	if (!bConnected)
+			//	{
+			//		break;
+			//	}
+			//
+			//}
+			//表示等待事件信号的来临，INFINITE 表示无限等待时间
+			//没有信号则会类似于死循环，下不来
+			OutputDebugStringA("等待事件信号的来临");
+			WaitForSingleObject(hEvent, INFINITE);
+		
 
 		}
 
-
-
-
-
 		});
-
-	//接触thd与线程回调函数的绑定
-	thd.detach();
 
 
 
@@ -633,19 +791,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 
 
-    MSG msg;
+	MSG msg;
 
-    // 主消息循环:
-    while (GetMessage(&msg, nullptr, 0, 0))
-    {
-  /*      if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
-        {*/
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-      /*  }*/
-    }
+	// 主消息循环:
+	while (GetMessage(&msg, nullptr, 0, 0))
+	{
+		/*      if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+			  {*/
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+		/*  }*/
+	}
 
-    return (int) msg.wParam;
+	return (int)msg.wParam;
 }
 
 
@@ -657,23 +815,23 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 //
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
-    WNDCLASSEXW wcex;
+	WNDCLASSEXW wcex;
 
-    wcex.cbSize = sizeof(WNDCLASSEX);
+	wcex.cbSize = sizeof(WNDCLASSEX);
 
-    wcex.style          = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc    = WndProc;
-    wcex.cbClsExtra     = 0;
-    wcex.cbWndExtra     = 0;
-    wcex.hInstance      = hInstance;
-    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_RECLIENTKBHCMD));
-    wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
-    wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_RECLIENTKBHCMD);
-    wcex.lpszClassName  = szWindowClass;
-    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+	wcex.style = CS_HREDRAW | CS_VREDRAW;
+	wcex.lpfnWndProc = WndProc;
+	wcex.cbClsExtra = 0;
+	wcex.cbWndExtra = 0;
+	wcex.hInstance = hInstance;
+	wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_RECLIENTKBHCMD));
+	wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+	wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+	wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_RECLIENTKBHCMD);
+	wcex.lpszClassName = szWindowClass;
+	wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
-    return RegisterClassExW(&wcex);
+	return RegisterClassExW(&wcex);
 }
 
 //
@@ -688,21 +846,21 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-   hInst = hInstance; // 将实例句柄存储在全局变量中
+	hInst = hInstance; // 将实例句柄存储在全局变量中
 
-   //HWND_MESSAGE
-   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, HWND_MESSAGE, nullptr, hInstance, nullptr);
+	//HWND_MESSAGE
+	HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+		CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, HWND_MESSAGE, nullptr, hInstance, nullptr);
 
-   if (!hWnd)
-   {
-      return FALSE;
-   }
+	if (!hWnd)
+	{
+		return FALSE;
+	}
 
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
+	ShowWindow(hWnd, nCmdShow);
+	UpdateWindow(hWnd);
 
-   return TRUE;
+	return TRUE;
 }
 
 //
@@ -717,8 +875,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    switch (message)
-    {
+	switch (message)
+	{
 	case WM_COPYDATA:
 	{
 		//接收从dll传来的数据
@@ -759,58 +917,58 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	break;
 
-    case WM_COMMAND:
-        {
-            int wmId = LOWORD(wParam);
-            // 分析菜单选择:
-            switch (wmId)
-            {
-            case IDM_ABOUT:
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-                break;
-            case IDM_EXIT:
-                DestroyWindow(hWnd);
-                break;
-            default:
-                return DefWindowProc(hWnd, message, wParam, lParam);
-            }
-        }
-        break;
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
-            // TODO: 在此处添加使用 hdc 的任何绘图代码...
-			GetMyCapture(s);
+	case WM_COMMAND:
+	{
+		int wmId = LOWORD(wParam);
+		// 分析菜单选择:
+		switch (wmId)
+		{
+		case IDM_ABOUT:
+			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+			break;
+		case IDM_EXIT:
+			DestroyWindow(hWnd);
+			break;
+		default:
+			return DefWindowProc(hWnd, message, wParam, lParam);
+		}
+	}
+	break;
+	case WM_PAINT:
+	{
+		PAINTSTRUCT ps;
+		HDC hdc = BeginPaint(hWnd, &ps);
+		// TODO: 在此处添加使用 hdc 的任何绘图代码...
+		GetMyCapture(s);
 
-            EndPaint(hWnd, &ps);
-        }
-        break;
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
-    default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
-    }
-    return 0;
+		EndPaint(hWnd, &ps);
+	}
+	break;
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		break;
+	default:
+		return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+	return 0;
 }
 
 // “关于”框的消息处理程序。
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    UNREFERENCED_PARAMETER(lParam);
-    switch (message)
-    {
-    case WM_INITDIALOG:
-        return (INT_PTR)TRUE;
+	UNREFERENCED_PARAMETER(lParam);
+	switch (message)
+	{
+	case WM_INITDIALOG:
+		return (INT_PTR)TRUE;
 
-    case WM_COMMAND:
-        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-        {
-            EndDialog(hDlg, LOWORD(wParam));
-            return (INT_PTR)TRUE;
-        }
-        break;
-    }
-    return (INT_PTR)FALSE;
+	case WM_COMMAND:
+		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+		{
+			EndDialog(hDlg, LOWORD(wParam));
+			return (INT_PTR)TRUE;
+		}
+		break;
+	}
+	return (INT_PTR)FALSE;
 }
