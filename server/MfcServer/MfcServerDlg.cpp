@@ -17,6 +17,10 @@
 #define new DEBUG_NEW
 #endif
 
+//对话框的this指针
+CMfcServerDlg* g_pDlg = NULL;
+
+
 
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
@@ -62,6 +66,13 @@ CMfcServerDlg::CMfcServerDlg(CWnd* pParent /*=nullptr*/)
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
 
+CMfcServerDlg::~CMfcServerDlg(void)
+{
+	 m_Iocp.Destory();
+
+}
+
+
 void CMfcServerDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
@@ -100,70 +111,70 @@ DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 		{
 
 
-			
-				
 
-				//开始遍历map,通过map的遍历，查找每一个客户端都是否在线
 
-				std::vector<SOCKET> sAry;
 
-				for (auto m : pThis->m_map) {
+			//开始遍历map,通过map的遍历，查找每一个客户端都是否在线
 
-					SOCKET s = m.first;
-					MySession* pSession = m.second;
+			std::vector<SOCKET> sAry;
 
-					//判断最后一次收包与当前时间，超过了两倍，则表示掉线了
-					if (GetTickCount() - pSession->dwLastTickout > HEART_BEAT_TIME * 2)
-					{
-						//此时掉线应该处理map，处理界面，处理socket
-						//1 处理socket
-						closesocket(s);
+			for (auto m : pThis->m_map) {
 
-						//建立一个sAry 记录当前所有掉线的socket
-						sAry.push_back(s);
+				SOCKET s = m.first;
+				MySession* pSession = m.second;
 
-					}
-
-				}
-
-				//开始统一处理掉线
-				//2 处理map
-
-				if (sAry.size() >0)
+				//判断最后一次收包与当前时间，超过了两倍，则表示掉线了
+				if (GetTickCount() - pSession->dwLastTickout > HEART_BEAT_TIME * 2)
 				{
-					std::lock_guard<std::mutex> lg(pThis->m_AcceptMtx);
-					for (auto l : sAry) {
+					//此时掉线应该处理map，处理界面，处理socket
+					//1 处理socket
+					closesocket(s);
 
-						pThis->m_map.erase(l);
+					//建立一个sAry 记录当前所有掉线的socket
+					sAry.push_back(s);
 
-					}
 				}
 
+			}
 
-				//界面上也去除这一行
-				for (int i = 0; i < pThis->m_Lst.GetItemCount(); i++)
+			//开始统一处理掉线
+			//2 处理map
+
+			if (sAry.size() > 0)
+			{
+				std::lock_guard<std::mutex> lg(pThis->m_AcceptMtx);
+				for (auto l : sAry) {
+
+					pThis->m_map.erase(l);
+
+				}
+			}
+
+
+			//界面上也去除这一行
+			for (int i = 0; i < pThis->m_Lst.GetItemCount(); i++)
+			{
+				//获得对应在界面的行数
+				SOCKET NewConnection = pThis->m_Lst.GetItemData(i);
+				//判断是否存在这个socket
+
+				for (auto l : sAry)
 				{
-					//获得对应在界面的行数
-					SOCKET NewConnection = pThis->m_Lst.GetItemData(i);
-					//判断是否存在这个socket
-
-					for (auto l : sAry)
+					if (l == NewConnection)
 					{
-						if (l == NewConnection)
-						{
-							pThis->m_Lst.DeleteItem(i);
-							break;
+						pThis->m_Lst.DeleteItem(i);
+						break;
 
-						}
 					}
-
-					sAry.clear();
-
-					Sleep(HEART_BEAT_TIME);
 				}
 
+				sAry.clear();
 
-			
+				Sleep(HEART_BEAT_TIME);
+			}
+
+
+
 
 
 
@@ -184,9 +195,10 @@ DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 		ClientAddr.sin_family = AF_INET;
 		int ClientAddrLen = sizeof(ClientAddr);
 		SOCKET NewConnection = accept(pThis->m_hAcceptSocket, (sockaddr*)&ClientAddr, &ClientAddrLen);
-		if (NewConnection == SOCKET_ERROR)
+		if (NewConnection == INVALID_SOCKET)
 		{
-			return 0;
+			continue;
+			//return 0;
 		}
 
 		//到这里表示当前有人连接我，记录当前连接我的人是谁，并显示到界面
@@ -260,8 +272,22 @@ DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 
 
 		//开启线程，显示收到的数据
+		
+		//来了客户端，我们需要绑定我们的socket
+
+		pThis->m_Iocp.Bind(NewConnection);
+
+		//一旦绑定之后，就需要去投递一个请求
+		//这里一定要保证每个线程永远只有一个WSARecv请求
+		pThis->m_Iocp.PostRecv(pSession);
 
 
+
+		//线程处理交给IOCP
+
+		
+
+		/*
 		std::thread thd([&]() {
 			//表示子程序新的起点
 			// 直接收取socket的数据，并显示出来（从客户端cmd里转发过来的）
@@ -281,7 +307,7 @@ DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 				}
 
 				//到这里表示成功收取了头部数据，接下来收取尾部数据
-				if (pkt.length > 0)
+				if (pkt.length > 0 )
 				{
 					//包的数据部分有数据
 
@@ -326,7 +352,7 @@ DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 
 
 						//通知客户端发下一张
-						SendCommand(NewConnection, PACKET_REQ_SCREEN);
+						//SendCommand(NewConnection, PACKET_REQ_SCREEN);
 
 					}
 
@@ -366,9 +392,9 @@ DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 
 
 			});
-
+		*/	
 		//接触thd与线程回调函数的绑定
-		thd.detach();
+		//thd.detach();
 
 
 
@@ -393,10 +419,12 @@ bool CMfcServerDlg::InitAcceptSocket() {
 
 
 	//1. socket 创建套接字 (可以理解成管道的Pipe句柄，用于后续数据传输接口)
-	m_hAcceptSocket = socket(
-		AF_INET,//INET协议簇
-		SOCK_STREAM,//表示使用TCP协议
-		0);
+	//m_hAcceptSocket = socket(
+	//	AF_INET,//INET协议簇
+	//	SOCK_STREAM,//表示使用TCP协议
+	//	0);
+	m_hAcceptSocket=WSASocket(AF_INET, SOCK_STREAM,
+		IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
 	if (m_hAcceptSocket == INVALID_SOCKET)
 	{
 
@@ -418,9 +446,11 @@ bool CMfcServerDlg::InitAcceptSocket() {
 
 	}
 
+
+
 	// 监听
 	nRet = listen(m_hAcceptSocket, 5);
-	if (nRet == SOCKET_ERROR)
+	if (nRet == SOCKET_ERROR )
 	{
 		return false;
 	}
@@ -503,13 +533,28 @@ BOOL CMfcServerDlg::OnInitDialog()
 	m_Lst.SetExtendedStyle(m_Lst.GetExtendedStyle() | LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
 
 	//m_Lst.InsertItem(0,_T("127.0.0.1"));
+	bool bRet = false;
 
-	//开始初始化网络
-	bool bRet = InitAcceptSocket();
+	/*
+		如果先初始化网络，有可能出现网络刚初始化完成，IOCP还没开启的情况
+	*/
+
+	//开启IOCP
+	bRet = m_Iocp.Create();
 	if (!bRet)
 	{
 		return FALSE;
 	}
+
+	//开始初始化网络
+	bRet = InitAcceptSocket();
+	if (!bRet)
+	{
+		return FALSE;
+	}
+
+	//对话框的this指针
+	g_pDlg = this;
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -606,8 +651,6 @@ void CMfcServerDlg::OnScreen()
 		//以后凡是需要对map进行增删改查都需要加上这样一句话
 		//每次只允许一个线程访问
 		std::lock_guard<std::mutex> lg(m_AcceptMtx);
-
-
 
 		//如果发现他原来没有对话框，就创建对话框
 		if (m_map[NewConnection]->pScreenDlg == NULL)

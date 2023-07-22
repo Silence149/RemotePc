@@ -40,7 +40,12 @@ END_MESSAGE_MAP()
 bool CScreenDlg::ShowScreen(const char* pBuf, int nLength)
 {
 	//获得当前的屏幕数据, 并显示到当前对话框里面来
+	if (pBuf == NULL)
+	{
+		return FALSE;
+	}
 	
+
 	tagScreenData* pScreenData = (tagScreenData*)pBuf;
 
 

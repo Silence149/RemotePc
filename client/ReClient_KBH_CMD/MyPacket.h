@@ -43,6 +43,31 @@ struct tagScreenData {
 
 };
 
+//I/O重叠结构
+//自己定义一个内存结构  
+
+#define TYPE_RECV 1
+#define TYPE_SEND 2
+
+struct MYOVERLAPPED
+{
+	WSAOVERLAPPED ol;//原始的重叠结构
+	int nType;		//后面定义自己的类型
+	char* pBuf;		//表示数据存放的缓冲区
+	MYOVERLAPPED() {
+		memset(&ol, 0, sizeof(WSAOVERLAPPED));
+		pBuf = NULL;
+		nType = TYPE_RECV;
+
+	}
+
+};
+
+
+
+
+
+
 
 
 

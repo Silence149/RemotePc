@@ -190,6 +190,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\client\ReClient_KBH_CMD\MyPacket.h" />
+    <ClInclude Include="Buffer.h" />
+    <ClInclude Include="CIocpServer.h" />
     <ClInclude Include="CScreenDlg.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="MfcServer.h" />
@@ -199,6 +201,8 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Buffer.cpp" />
+    <ClCompile Include="CIocpServer.cpp" />
     <ClCompile Include="CScreenDlg.cpp" />
     <ClCompile Include="MfcServer.cpp" />
     <ClCompile Include="MfcServerDlg.cpp" />

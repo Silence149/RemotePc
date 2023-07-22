@@ -7,29 +7,8 @@
 #include <map>
 #include <mutex>
 #include <stdio.h>
+#include "CIocpServer.h"
 
-
-
-class CScreenDlg;
-
-
-
-//建立一个结构体来表示当前的连接数据 session会话
-struct MySession
-{
-	SOCKET client;//表示客户机的socket
-	sockaddr_in addr;
-	DWORD dwLastTickout;//客户机通信最后活跃时间，后面用于心跳管理
-	std::string strIp;//表示客户机ip地址
-	
-	CScreenDlg* pScreenDlg;//用于记录当前session的屏幕对话框
-
-	MySession() {
-		pScreenDlg = NULL;
-	
-	}
-
-};
 
 
 
@@ -42,6 +21,7 @@ class CMfcServerDlg : public CDialogEx
 // 构造
 public:
 	CMfcServerDlg(CWnd* pParent = nullptr);	// 标准构造函数
+	~CMfcServerDlg(void);
 
 // 对话框数据
 #ifdef AFX_DESIGN_TIME
@@ -81,6 +61,9 @@ public:
 	std::mutex m_AcceptMtx;//用于记录map的同步问题
 
 	std::mutex m_ScreenMtx;//用于屏幕显示的同步问题
+
+	CIocpServer m_Iocp;//用于IOCP的处理
+
 
 
 	afx_msg void OnNMRClickList1(NMHDR *pNMHDR, LRESULT *pResult);
