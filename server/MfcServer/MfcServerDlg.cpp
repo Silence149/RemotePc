@@ -128,10 +128,23 @@ DWORD CMfcServerDlg::AcceptFuncThread(LPVOID lpParam) {
 				{
 					//此时掉线应该处理map，处理界面，处理socket
 					//1 处理socket
-					closesocket(s);
+					
+					//auto item = g_pDlg->m_map.find(s);
+					//if (item != g_pDlg->m_map.cend())
+					//{
+					//	//表示能够找到对应的Session
+					//	MySession* pSession = item->second;
+					//	//客户端掉线了，应当干掉对应的session
+					//	delete pSession;
+					//}
+					//delete pSession;
+					
 
 					//建立一个sAry 记录当前所有掉线的socket
 					sAry.push_back(s);
+
+					closesocket(s);
+					s = INVALID_SOCKET;
 
 				}
 
@@ -642,7 +655,18 @@ void CMfcServerDlg::OnScreen()
 	//获得刚才存储的data，也就是我们的socket
 	SOCKET NewConnection = m_Lst.GetItemData(nPos);
 	//向该socket发送一个，请求屏幕信息的命令
-	SendCommand(NewConnection, PACKET_REQ_SCREEN);
+
+	//同步的方式
+	//SendCommand(NewConnection, PACKET_REQ_SCREEN);
+	//异步IOCP的方式
+	auto item = g_pDlg->m_map.find(NewConnection);
+	if (item != g_pDlg->m_map.cend())
+	{
+		//表示能够找到对应的Session
+		MySession* pSession = item->second;
+		m_Iocp.SendData(pSession, PACKET_REQ_SCREEN);
+	}
+	
 	//创建一个屏幕对话框
 	//根据socket 获取对应的socket上下文
 

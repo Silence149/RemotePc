@@ -62,7 +62,7 @@ public:
 
 	std::mutex m_ScreenMtx;//用于屏幕显示的同步问题
 
-	CIocpServer m_Iocp;//用于IOCP的处理
+	CIocpServer m_Iocp;//用于IOCP的处理  相当于IOCPBase类
 
 
 

@@ -45,6 +45,11 @@ struct MySession
 
 	}
 
+	~MySession() {
+		//recvBuf.ClearBuffer();
+		//sendBuf.ClearBuffer();
+	}
+
 };
 
 

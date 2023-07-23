@@ -64,7 +64,7 @@ DWORD CIocpServer::ThreadFunc(LPVOID lpParam)
 
 				//根据对应的socket 找到我们对应的pSession  （根据hash map   键值对查找）
 				//我们需要把每一次收到的数据缓存起来，直到收到一个完整的包格式。最后才去处理
-				auto item = g_pDlg->m_map.find(dwCompletionKey);
+				auto item = g_pDlg->m_map.find(dwCompletionKey);//这里的完成键里面放了绑定时候的socket
 				if (item != g_pDlg->m_map.cend())
 				{
 					//表示能够找到对应的Session
